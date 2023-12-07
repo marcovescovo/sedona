@@ -66,22 +66,29 @@ public class KnnJudgement<U extends Geometry, T extends Geometry>
             throws Exception
     {
         PriorityQueue<T> pq = new PriorityQueue<T>(k, new GeometryDistanceComparator(queryCenter, false));
+        ArrayList<T> res = new ArrayList<T>();
         while (input.hasNext()) {
-            if (pq.size() < k) {
+            //if (pq.size() < k) {
+            if (false) {
                 pq.offer(input.next());
             }
             else {
                 T curpoint = input.next();
                 double distance = curpoint.distance(queryCenter);
-                double largestDistanceInPriQueue = pq.peek().distance(queryCenter);
-                if (largestDistanceInPriQueue > distance) {
-                    pq.poll();
-                    pq.offer(curpoint);
+                if (distance < 0) {
+                	distance = -1 * distance;
+                }
+                //double largestDistanceInPriQueue = pq.peek().distance(queryCenter);
+                //if (largestDistanceInPriQueue > distance) {
+                if (k >= distance) {
+                    //pq.poll();
+                    //pq.offer(curpoint);
+                    res.add(curpoint);
                 }
             }
         }
-        ArrayList<T> res = new ArrayList<T>();
-        if (pq.size() >= k) {
+        //if (pq.size() >= k) {
+        /*if (false) {
             for (int i = 0; i < k; i++) {
                 res.add(pq.poll());
             }
@@ -89,7 +96,7 @@ public class KnnJudgement<U extends Geometry, T extends Geometry>
             for (int i = 0; i < pq.size(); i++) {
                 res.add(pq.poll());
             }
-        }
+        }*/
         return res.iterator();
     }
 }

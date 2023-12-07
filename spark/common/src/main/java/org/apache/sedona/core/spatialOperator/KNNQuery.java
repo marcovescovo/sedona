@@ -73,7 +73,8 @@ public class KNNQuery
         }
         else {
             JavaRDD<T> tmp = spatialRDD.getRawSpatialRDD().mapPartitions(new KnnJudgement(queryCenter, k));
-            List<T> result = tmp.takeOrdered(k, new GeometryDistanceComparator(queryCenter, true));
+            //List<T> result = tmp.takeOrdered(k, new GeometryDistanceComparator(queryCenter, true));
+            List<T> result = tmp.collect();
             // Take the top k
             return result;
         }
