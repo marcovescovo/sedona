@@ -45,6 +45,11 @@ public class KnnJudgementUsingIndex<U extends Geometry, T extends Geometry>
     int k;
 
     /**
+     * The distance.
+     */
+    double d;
+
+    /**
      * The query center.
      */
     U queryCenter;
@@ -55,10 +60,11 @@ public class KnnJudgementUsingIndex<U extends Geometry, T extends Geometry>
      * @param queryCenter the query center
      * @param k the k
      */
-    public KnnJudgementUsingIndex(U queryCenter, int k)
+    public KnnJudgementUsingIndex(U queryCenter, int k, double d)
     {
         this.queryCenter = queryCenter;
         this.k = k;
+        this.d = d;
     }
 
     /* (non-Javadoc)
@@ -70,8 +76,8 @@ public class KnnJudgementUsingIndex<U extends Geometry, T extends Geometry>
     {
         SpatialIndex treeIndex = treeIndexes.next();
         final Object[] localK;
-        if (treeIndex instanceof STRtree) {
-            localK = ((STRtree) treeIndex).nearestNeighbour(queryCenter.getEnvelopeInternal(), queryCenter, new GeometryItemDistance(), k);
+        if (treeIndex instanceof MySTRtree) {
+            localK = ((MySTRtree) treeIndex).nearestNeighbour(queryCenter.getEnvelopeInternal(), queryCenter, new GeometryItemDistance(), k, d);
         }
         else {
             throw new Exception("[KnnJudgementUsingIndex][Call] QuadTree index doesn't support KNN search.");

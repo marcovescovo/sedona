@@ -40,11 +40,17 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.geom.Polygon;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
 import java.io.Serializable;
+import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
@@ -56,6 +62,9 @@ import java.time.format.DateTimeFormatter;
 public class Example
         implements Serializable
 {
+
+	public static BigInteger globalCounter = new BigInteger("0");
+	public static int powFactor = 1;
 
     /**
      * The sc.
@@ -71,6 +80,11 @@ public class Example
      * The Point RDD input location.
      */
     static String PointRDDInputLocation;
+
+    /**
+     * The input location.
+     */
+    static String InputLocation;
 
     /**
      * The Point RDD offset.
@@ -96,6 +110,11 @@ public class Example
      * The object RDD.
      */
     static PointRDD objectRDD;
+
+    /**
+     * The object RDD.
+     */
+    static PolygonRDD objectPolRDD;
 
     /**
      * The Polygon RDD input location.
@@ -143,6 +162,11 @@ public class Example
     static Point kNNQueryPoint;
 
     /**
+     * The k NN query point.
+     */
+    static Polygon kNNQueryPolygon;
+
+    /**
      * The range query window.
      */
     static Envelope rangeQueryWindow;
@@ -156,7 +180,7 @@ public class Example
      */
     public static void main(String[] args)
     {
-        SparkConf conf = new SparkConf().setAppName("SedonaRunnableExample").setMaster("local[2]");
+        SparkConf conf = new SparkConf().setAppName("SedonaRunnableExample").setMaster("local[1]");
         conf.set("spark.serializer", KryoSerializer.class.getName());
         conf.set("spark.kryo.registrator", SedonaKryoRegistrator.class.getName());
 
@@ -167,6 +191,7 @@ public class Example
         String resourceFolder = System.getProperty("user.dir") + "/src/test/resources/";
 
         PointRDDInputLocation = resourceFolder + "arealm-small.csv";
+        InputLocation = resourceFolder + "primaryroads-polygon.csv";
         PointRDDSplitter = FileDataSplitter.CSV;
         PointRDDIndexType = IndexType.RTREE;
         PointRDDNumPartitions = 5;
@@ -179,7 +204,7 @@ public class Example
         PolygonRDDEndOffset = 8;
 
         geometryFactory = new GeometryFactory();
-        kNNQueryPoint = geometryFactory.createPoint(new Coordinate(500000, 500000));
+        kNNQueryPoint = geometryFactory.createPoint(new Coordinate(0.5 * powFactor, 0.5 * powFactor));
         rangeQueryWindow = new Envelope(-90.01, -80.01, 30.01, 40.01);
         joinQueryPartitioningType = GridType.QUADTREE;
         eachQueryLoopTimes = 5;
@@ -251,31 +276,93 @@ public class Example
     	////////////////////////////////////////////////////////////////
         // Define a formatter for the timestamp (optional)
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
+    	
+    	for (int i = 0; i <= 1000; i++) {
+    		if (i != 1 && i != 10 && i != 50 && i != 100 && i != 1000) {
+    			continue;
+    		}
+    		
+    		for (int j = 1; j<=3; j++) {
+    			
+    			globalCounter = new BigInteger("0");
+    	        
+    	        try (BufferedReader br = new BufferedReader(new FileReader(InputLocation))) {
+
+    	            String line;
+    	            objectRDD = new PointRDD(sc, PointRDDInputLocation, PointRDDOffset, PointRDDSplitter, true);
+    	            objectPolRDD = new PolygonRDD(sc, PolygonRDDInputLocation, PolygonRDDStartOffset, PolygonRDDNumPartitions, PolygonRDDSplitter, true);
+    	            objectPolRDD.rawSpatialRDD.persist(StorageLevel.MEMORY_ONLY());
+    	            objectPolRDD.buildIndex(PointRDDIndexType, false);
+    	            LocalDateTime startDateTime = LocalDateTime.now();
+    	            String formattedTimestamp = startDateTime.format(formatter);
+
+    	            HashMap<Point,ArrayList> mappa = new HashMap<Point,ArrayList>();
+    	            HashMap<Polygon,ArrayList> mappa_polygon = new HashMap<Polygon,ArrayList>();
+    	            
+    	            System.out.println("Test "+ i +"/"+ j +" - Start Timestamp: " + formattedTimestamp);
+    	            
+    	            while ((line = br.readLine()) != null) {
+    	                ArrayList<Point> result_final = new ArrayList<Point>();
+    	                ArrayList<Polygon> result_final_polygon = new ArrayList<Polygon>();
+    	                // Process each line
+    	                String[] fields = line.split(",");
+    	                
+    	                // Do something with the fields (for example, print them)
+    	                for (String field : fields) {
+    	                    kNNQueryPoint = geometryFactory.createPoint(new Coordinate(Double.parseDouble(fields[0]), Double.parseDouble(fields[1])));
+    	                    kNNQueryPolygon = geometryFactory.createPolygon(geometryFactory.createLinearRing(new Coordinate[]{
+    	                            new Coordinate(Double.parseDouble(fields[0]) * powFactor, Double.parseDouble(fields[1]) * powFactor),
+    	                            new Coordinate(Double.parseDouble(fields[0])*2 * powFactor, Double.parseDouble(fields[1]) * powFactor),
+    	                            new Coordinate(Double.parseDouble(fields[0])*2 * powFactor, Double.parseDouble(fields[1])*2 * powFactor),
+    	                            new Coordinate(Double.parseDouble(fields[0]) * powFactor, Double.parseDouble(fields[1])*2 * powFactor),
+    	                            new Coordinate(Double.parseDouble(fields[0]) * powFactor, Double.parseDouble(fields[1]) * powFactor)
+    	                            }), null);
+    	                	List<Polygon/*Point*/> result = KNNQuery.SpatialKnnQuery(objectPolRDD/*objectRDD*/, kNNQueryPolygon/*kNNQueryPoint*/, i, true);
+    	                	//List<Polygon/*Point*/> result = KNNQuery.SpatialKnnQuery(objectPolRDD/*objectRDD*/, kNNQueryPolygon/*kNNQueryPoint*/, i, false);
+    	                    assert result.size() > -1;
+    	                    /*if (result.size() > 0) {
+    	                    	for (int j = 0; j < result.size(); j++) {
+    	                    		if (result_final_polygon.contains(result.get(j)) == false) {}
+    	                            result_final_polygon.add(result.get(j));	
+    	                    	}	
+    	                    }
+    	                    //result_final_polygon.sort(null);
+    	                    if (result_final_polygon.size() > 0) {
+    	                    	mappa_polygon.put(kNNQueryPolygon, result_final_polygon);
+    	                    }*/
+    	                    
+    	                    //System.out.println(result_final.size());
+    	                    //System.out.println();
+    	                }
+    	            }
+    	        	LocalDateTime endDateTime = LocalDateTime.now();
+    	            formattedTimestamp = endDateTime.format(formatter);
+    	            System.out.println("End Timestamp: " + formattedTimestamp);
+    	            System.out.println("Time elapsed: " + formatDuration(startDateTime, endDateTime));
+    	            System.out.println("Operations performed: " + globalCounter.toString());
+    	            System.out.println();
+
+    	        } catch (IOException e) {
+    	            e.printStackTrace();
+    	        }
+    			
+    		}
+    	}
         ////////////////////////////////////////////////////////////////
-        objectRDD = new PointRDD(sc, PointRDDInputLocation, PointRDDOffset, PointRDDSplitter, true);
-        objectRDD.rawSpatialRDD.persist(StorageLevel.MEMORY_ONLY());
-        ArrayList<Point> result_final = new ArrayList<Point>();
-        //for (int i = 0; i < eachQueryLoopTimes; i++) {
-        //for (int i = 0; i < objectRDD.approximateTotalCount; i++) {
-        	//List<Point> result = KNNQuery.SpatialKnnQuery(objectRDD, kNNQueryPoint, 1000, false);
-        LocalDateTime startDateTime = LocalDateTime.now();
-        String formattedTimestamp = startDateTime.format(formatter);
-        System.out.println("Start Timestamp: " + formattedTimestamp);
-    	List<Point> result = KNNQuery.SpatialKnnQuery(objectRDD, kNNQueryPoint, 100000, false);
-    	LocalDateTime endDateTime = LocalDateTime.now();
-        formattedTimestamp = endDateTime.format(formatter);
-        System.out.println("End Timestamp: " + formattedTimestamp);
-        assert result.size() > -1;
-        if (result.size() > 0) {
-        	for (int j = 0; j < result.size(); j++) {
-        		if (result_final.contains(result.get(j)) == false) {}
-                result_final.add(result.get(j));	
-        	}	
-        }
-        
-        System.out.println(result_final.size());
-        System.out.println();
     }
+    
+    private static String formatDuration(LocalDateTime startTime, LocalDateTime endTime) {
+    	
+    	Duration duration = Duration.between(startTime, endTime);
+    	
+        long hours = duration.toHours();
+        long minutes = duration.toMinutesPart();
+        long seconds = duration.toSecondsPart();
+        long millis = duration.toMillisPart();
+
+        return String.format("%02d:%02d:%02d.%03d", hours, minutes, seconds, millis);
+    }
+
 
     /**
      * Test spatial knn query using index.
@@ -289,7 +376,7 @@ public class Example
         objectRDD.buildIndex(PointRDDIndexType, false);
         objectRDD.indexedRawRDD.persist(StorageLevel.MEMORY_ONLY());
         for (int i = 0; i < eachQueryLoopTimes; i++) {
-            List<Point> result = KNNQuery.SpatialKnnQuery(objectRDD, kNNQueryPoint, 1000, true);
+            List<Point> result = KNNQuery.SpatialKnnQuery(objectRDD, kNNQueryPoint, 10, true);
             assert result.size() > -1;
         }
     }

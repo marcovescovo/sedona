@@ -19,12 +19,10 @@
 
 package org.apache.sedona.core.knnJudgement;
 
-import org.apache.sedona.core.showcase.Example;
 import org.apache.spark.api.java.function.FlatMapFunction;
 import org.locationtech.jts.geom.Geometry;
 
 import java.io.Serializable;
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.PriorityQueue;
@@ -46,7 +44,7 @@ public class KnnJudgement<U extends Geometry, T extends Geometry>
     /**
      * The distance.
      */
-    double d;
+    int d;
 
     /**
      * The query center.
@@ -59,7 +57,7 @@ public class KnnJudgement<U extends Geometry, T extends Geometry>
      * @param queryCenter the query center
      * @param k the k
      */
-    public KnnJudgement(U queryCenter, int k, double d)
+    public KnnJudgement(U queryCenter, int k, int d)
     {
         this.queryCenter = queryCenter;
         this.k = k;
@@ -73,31 +71,42 @@ public class KnnJudgement<U extends Geometry, T extends Geometry>
     public Iterator<T> call(Iterator<T> input)
             throws Exception
     {
-    	BigInteger counter = BigInteger.ZERO;
-    	//counter = counter.add(new BigInteger("1"));
         PriorityQueue<T> pq = new PriorityQueue<T>(k, new GeometryDistanceComparator(queryCenter, false));
+        ArrayList<T> res = new ArrayList<T>();
         while (input.hasNext()) {
-        	counter = counter.add(new BigInteger("1"));
-            T curpoint = input.next();
-            double distance = curpoint.distance(queryCenter);
-            if (d >= distance) {
-            	//counter = counter.add(new BigInteger("1"));
-                pq.offer(curpoint);
+            if (pq.size() < k) {
+	            if (false) {
+	                pq.offer(input.next());
+	            }
+	            else {
+	                T curpoint = input.next();
+	                double distance = curpoint.distance(queryCenter);
+	                if (distance < 0) {
+	                	distance = -1 * distance;
+	                }
+	                double largestDistanceInPriQueue = Integer.MAX_VALUE;
+	                if (pq.isEmpty() == false) {
+	                	largestDistanceInPriQueue = pq.peek().distance(queryCenter);
+	                }
+	                if (largestDistanceInPriQueue > distance) {
+		                if (d >= distance) {
+		                    pq.poll();
+		                    pq.offer(curpoint);
+		                    res.add(curpoint);
+		                }
+	                }
+	            }
             }
         }
-        ArrayList<T> res = new ArrayList<T>();
         if (pq.size() >= k) {
             for (int i = 0; i < k; i++) {
-            	//counter = counter.add(new BigInteger("1"));
                 res.add(pq.poll());
             }
         } else {
             for (int i = 0; i < pq.size(); i++) {
-            	//counter = counter.add(new BigInteger("1"));
                 res.add(pq.poll());
             }
         }
-        Example.globalCounter = Example.globalCounter.add(counter);
         return res.iterator();
     }
 }

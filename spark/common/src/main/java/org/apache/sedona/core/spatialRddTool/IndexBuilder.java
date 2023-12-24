@@ -19,6 +19,7 @@
 
 package org.apache.sedona.core.spatialRddTool;
 
+import org.apache.sedona.core.knnJudgement.MySTRtree;
 import org.apache.sedona.core.enums.IndexType;
 import org.apache.spark.api.java.function.FlatMapFunction;
 import org.locationtech.jts.geom.Envelope;
@@ -47,7 +48,7 @@ public final class IndexBuilder<T extends Geometry>
     {
         SpatialIndex spatialIndex;
         if (indexType == IndexType.RTREE) {
-            spatialIndex = new STRtree();
+            spatialIndex = new MySTRtree();
         }
         else {
             spatialIndex = new Quadtree();

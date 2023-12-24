@@ -235,10 +235,14 @@ public class FormatUtils<T extends Geometry> implements Serializable {
     public Coordinate[] readCoordinates(String line)
     {
         final String[] columns = line.split(splitter.getDelimiter());
-        final int actualEndOffset = this.endOffset >= 0 ? this.endOffset : (this.geometryType == GeometryType.POINT ? startOffset + 1 : columns.length - 1);
+        final int actualEndOffset = /*this.endOffset >= 0 ? this.endOffset : (*/this.geometryType == GeometryType.POINT ? startOffset + 1 : columns.length - 1;//);
         final Coordinate[] coordinates = new Coordinate[(actualEndOffset - startOffset + 1) / 2];
         for (int i = this.startOffset; i <= actualEndOffset; i += 2) {
-            coordinates[(i - startOffset) / 2] = new Coordinate(Double.parseDouble(columns[i]), Double.parseDouble(columns[i + 1]));
+        	try {
+        		coordinates[(i - startOffset) / 2] = new Coordinate(Double.parseDouble(columns[i]), Double.parseDouble(columns[i + 1]));
+        	} catch (Exception e) {
+        		System.out.println(e);
+        	}
         }
         if (carryInputData) {
             boolean firstColumnFlag = true;

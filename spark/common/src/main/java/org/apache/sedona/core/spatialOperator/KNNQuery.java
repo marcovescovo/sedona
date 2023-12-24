@@ -53,6 +53,7 @@ public class KNNQuery
     public static <U extends Geometry, T extends Geometry> List<T> SpatialKnnQuery(SpatialRDD<T> spatialRDD, U originalQueryPoint, Integer k, boolean useIndex)
     {
         U queryCenter = originalQueryPoint;
+        double d = 0.25;
         if (spatialRDD.getCRStransformation()) {
             try {
                 queryCenter = (U) FunctionsGeoTools.transform(originalQueryPoint, spatialRDD.getSourceEpsgCode(), spatialRDD.getTargetEpgsgCode());
@@ -66,15 +67,15 @@ public class KNNQuery
             if (spatialRDD.indexedRawRDD == null) {
                 throw new NullPointerException("Need to invoke buildIndex() first, indexedRDDNoId is null");
             }
-            JavaRDD<T> tmp = spatialRDD.indexedRawRDD.mapPartitions(new KnnJudgementUsingIndex(queryCenter, k));
+            JavaRDD<T> tmp = spatialRDD.indexedRawRDD.mapPartitions(new KnnJudgementUsingIndex(queryCenter, k, d));
             List<T> result = tmp.takeOrdered(k, new GeometryDistanceComparator(queryCenter, true));
             // Take the top k
             return result;
         }
         else {
-            JavaRDD<T> tmp = spatialRDD.getRawSpatialRDD().mapPartitions(new KnnJudgement(queryCenter, k));
-            //List<T> result = tmp.takeOrdered(k, new GeometryDistanceComparator(queryCenter, true));
-            List<T> result = tmp.collect();
+            JavaRDD<T> tmp = spatialRDD.getRawSpatialRDD().mapPartitions(new KnnJudgement(queryCenter, k, d));
+            List<T> result = tmp.takeOrdered(k, new GeometryDistanceComparator(queryCenter, true));
+            //List<T> result = tmp.collect();
             // Take the top k
             return result;
         }
